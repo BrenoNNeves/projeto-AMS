@@ -27,6 +27,10 @@ para qualquer empresa é uma linha genérica — o exemplo do seu segmento
 **Performance:**
 
 O desempenho vai partir do pincipio se o agente esta classificando corretamente as ordens de serviço, tendo a formula a porcentagem de acertos 
+Fórmula:
+
+Taxa de acerto = (Número de ordens com todas as decisões corretas / Total de ordens avaliadas) × 100
+
 
 **Environment:**
 
