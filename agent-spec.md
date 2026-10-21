@@ -26,7 +26,7 @@ para qualquer empresa é uma linha genérica — o exemplo do seu segmento
 
 **Performance:**
 
-O desempenho vai partir do pincipio se o agente esta classificando corretamente as ordens de serviço, tendo a formula a porcentagem de acertos 
+O desempenho vai partir do pincipio se o agente esta classificando corretamente as ordens de serviço, tendo a formula a porcentagem de acertos, meta de aceito é de 95% hoje (70%)
 Fórmula:
 
 Taxa de acerto = (Número de ordens com todas as decisões corretas / Total de ordens avaliadas) × 100
@@ -64,10 +64,14 @@ Perguntas que guiam o preenchimento (uma por dimensão):
   Cada classificação vem com uma frase de justificativa — a etiqueta sozinha
   não vale nada.
 -->
-**Quando se preenche:** no Laboratório 02, no sábado (encontro 2).
+- **Observabilidade: parcialmente observável.** Em cada solicitação, o AMS recebe as leituras disponíveis (temperaturas, rotação, torque e desgaste), a identificação/tipo da máquina e a descrição da ordem de serviço. Isso não revela necessariamente o histórico completo de manutenção, o estado de outros componentes, as condições do local nem como o procedimento será executado; esses fatores podem alterar o risco e a aplicação das normas.
+- **Determinismo: estocástico.** As mesmas leituras não garantem o mesmo resultado: falhas podem ter causas distintas e são minoria no AI4I 2020. O conjunto de dados mostra associações, não uma regra determinística que permita afirmar que uma máquina falhará ou não.
+- **Número de agentes: multiagente.** O AMS recomenda, mas o técnico responsável decide se segue a recomendação e executa a intervenção; o supervisor pode revisar o parecer. As ações humanas influenciam o desfecho, portanto o sistema não atua isoladamente.
+- **Episódico ou sequencial: sequencial no domínio operacional.** A avaliação de uma ordem é uma unidade, mas a decisão do técnico afeta o estado futuro: fazer manutenção pode reduzir o desgaste, enquanto adiar uma intervenção pode levar a novas leituras ou ordens. O protótipo atual recebe registros e não simula essas transições; essa dimensão descreve o uso pretendido na planta.
+- **Estático ou dinâmico: dinâmico na planta.** Enquanto o AMS analisa uma leitura, a máquina pode continuar operando e seu estado pode mudar. Como o protótipo avalia um retrato dos dados recebido na solicitação, a recomendação precisa ser revista se houver mudança relevante antes da intervenção.
+- **Discreto ou contínuo: misto, com variáveis contínuas.** Temperaturas, rotação, torque e desgaste são medidas numéricas; o tipo de produto, os níveis de risco, as normas selecionadas e a decisão de bloqueio são categorias discretas. A saída do AMS, portanto, é discreta, embora parte do estado observado seja numérico.
+- **Conhecido ou desconhecido: desconhecido quanto à relação entre estado e falha.** O formato da entrada e da saída é definido, mas a relação entre as leituras e a ocorrência de falhas não é conhecida de antemão e precisa ser estimada e validada com dados. A descrição da ordem também não basta para determinar com certeza quais exigências de segurança se aplicam; recomendações normativas precisam ser verificadas contra as normas vigentes e pelo responsável técnico.
 
-[uma linha por dimensão: a classificação e a frase de
-justificativa — começando por observabilidade e determinismo]
 
 ---
 
@@ -81,10 +85,7 @@ Perguntas que guiam o preenchimento:
     observável elimina o reativo simples.
   - Justifique com a dimensão do ambiente que obriga a escolha.
 -->
-**Quando se preenche:** no sábado (encontro 2, manhã).
-
-[o tipo mais simples que resolve, justificado pela dimensão
-do ambiente que o obriga]
+**Quando se preenche: Tipo 3** o agente deve entender o estado atual e qual deve ser o desejado, deve entender como as maquinas estão e qual deve ser o rumo que deve ser tomado, parar, acionar tecnico ou outra, sempre buscando qual a sequencia ideal para chegar ao objetivo especificado.
 
 ---
 
@@ -103,9 +104,38 @@ Perguntas que guiam o preenchimento:
 operacional completa — primária, secundárias, conjunto e limiar — é item da
 Atividade Orientada.
 
-[métrica primária e duas secundárias, cada uma com: como se
-calcula, sobre qual conjunto, qual o limiar de sucesso e o
-valor de hoje]
+**Métrica principal: acerto integral da ordem.** A ideia é comparar cada `AvaliacaoRisco`
+com o parecer de referência, que foi revisado por um técnico e pelo supervisor. Uma ordem
+só conta como certa quando bate o nível de risco, o conjunto de normas aplicáveis
+e a decisão sobre bloqueio, os três juntos.
+
+`acerto integral (%) = ordens com os três campos corretos / total de ordens avaliadas × 100`
+
+Para começar vamos usar as **20 ordens que o cliente ja processou** no AMS,
+com os pareceres de referência definidos pelo técnico e pelo supervisor
+antes de rodar qualquer avaliação. Cada ordem errada derruba o resultado em 5 pontos, ou seja uma só ja deixa em 95%. 
+Vale congelar essa versão do conjunto e anotar a data da revisão. Meta: **pelo menos 95%**.
+Hoje estamos em **70%**, mas esse número vem só da estimativa que ficou registrada na seção PEAS,
+então ainda falta confirmar no conjunto fixo e fazer a revisão.
+
+**Métrica secundaria: sensibilidade para falhas.** Olhando só as leituras do
+conjunto de teste do AI4I 2020 que têm falha registrada, calculamos quantas
+o agente marca como risco alto.
+
+`sensibilidade (%) = falhas reais sinalizadas como risco alto / total de falhas reais × 100`
+
+O teste sera fixo e estratificado, com **2.000 registros (20% dos 10.000)**, e
+sem misturar com os dados usados para ajustar o modelo. O arquivo
+não traz um periodo individual de coleta, então não dá para falar em janela de tempo. Meta: **pelo menos 90%**.
+Valor atual: **ainda não medido**. A acuracia da regra exploratoria de desgaste
+não serve como medida dessa sensibilidade, e também não valida a resposta completa do agente.
+
+**Métrica secundária: latência p95.** Pegamos os tempos totais registrados
+das avaliações concluidas, ordenamos e olhamos o percentil 95. Vamos usar as mesmas **20
+ordens em três rodadas online (60 avaliações no total)**, anotando a data e o modelo
+configurado, e sem misturar com execuções offline. Meta: **p95 de até 30 segundos
+por ordem**. Valor atual: **ainda não medido numa execução online instrumentada**,
+já que o modo offline não representa a latência real do serviço.
 
 ---
 
@@ -122,9 +152,25 @@ Perguntas que guiam o preenchimento:
 -->
 **Quando se preenche:** na Atividade Orientada.
 
-[latência aceitável, custo aceitável, o que o agente jamais
-pode fazer sozinho, e a troca qualidade × custo que você
-aceita — com um exemplo numérico]
+- **Latência aceitável:** até **30 segundos por ordem** no percentil 95, da
+  submissão até a `AvaliacaoRisco` validada. Passou disso a recomendação já perde
+  o valor pro técnico, então a execução tem que ser registrada como fora do limite e
+  mandada pra análise humana.
+- **Custo aceitável:** o limite inicial é de **US$ 0,01 por ordem** em chamadas
+  online, calculado pelos tokens de entrada e saída e registrado em
+  `custo_usd`. O modo offline custa US$ 0 em chamadas, mas não serve
+  pra afirmar que o limite online foi atendido.
+- **Ação proibida sem confirmação humana:** o AMS nunca pode parar ou
+  religar uma máquina, aplicar ou retirar bloqueio e etiquetagem (LOTO), nem
+  executar qualquer intervenção. Ele só recomenda, quem confirma e executa
+  qualquer ação física é o técnico responsável.
+- **Troca qualidade × custo:** numa comparação de modelos com um conjunto
+  ampliado de pelo menos **100 ordens** (pra que a diferença em pontos
+  percentuais possa ser medida), aceito baixar o acerto integral de 95% para
+  **no minimo 93%** se o custo por ordem cair pelo menos **50%**, a sensibilidade
+  para falhas continuar em **90% ou mais** e o limite de latência for mantido.
+  Não aceito economia que aumente as falhas não sinalizadas, nesse caso mantenho
+  o modelo mais seguro ou mando a ordem pra revisão humana.
 
 ---
 
@@ -149,7 +195,37 @@ errar — ações de leitura e de escrita]
 ---
 
 ## 7. Formulação por busca
+| Subproblema              | Estado                              | Ação                              | Custo                  |
+|--------------------------|-------------------------------------|-----------------------------------|------------------------|
+| Ordem de verificações   | Verificações feitas e resultados    | Fazer a próxima verificação       | Tempo da verificação   |
+| Sequência de consultas  | O que já se sabe                    | Consultar uma fonte               | Latência da consulta   |
+| Roteiro de conformidade | Itens verificados e pendências      | Verificar item ou resolver pendência | Esforço             |
 
+verificar-formulacao — teste de sanidade da formulação de busca
+
+— comum/problemas/consultas.py:PEQUENA
+  1. estado é hashable ✅
+  2. transição é função ✅
+  3. ações estáveis na ordem ✅
+  4. custo é positivo ou zero ✅
+  5. objetivo é alcançável ✅
+  6. estado não guarda o caminho ✅
+  resumo: 6 ✅ · 0 ⚠️ · 0 ❌
+
+  # As sete dimensões do agente `FONTES_PEQUENAS`
+
+Problema: classe `Consultas`, instância `PEQUENA` (4 fatos, 5 fontes).
+Pergunta: *"quantos dias de férias ainda tenho, já considerando a venda do saldo que pedi?"*
+
+| Dimensão | Classificação | Por quê |
+|---|---|---|
+| **Observabilidade** | Totalmente observável | O estado é o conjunto de fatos já sabidos. O agente sempre sabe o que já tem e o que falta (`fatos_necessarios`). |
+| **Número de agentes** | Agente único | Só o agente decide. As fontes são passivas e ninguém mais age sobre o resultado. |
+| **Determinismo** | Determinístico | `transicao` é uma função pura: a mesma fonte, no mesmo estado, devolve sempre os mesmos fatos. A latência também é fixa. |
+| **Episódico ou sequencial** | Sequencial | Cada consulta muda o que vale a pena consultar depois. Se o PDF do acordo já entregou a "janela mínima", a intranet vira redundante. O custo também se acumula ao longo do caminho. |
+| **Estático ou dinâmico** | Estático | Fatos, fontes e latências não mudam enquanto o agente delibera. |
+| **Discreto ou contínuo** | Discreto | Os estados são subconjuntos de 4 fatos (no máximo 2⁴ = 16) e as ações são 5 fontes. A latência é um número real, mas é só o custo da ação, não uma variável de estado. |
+| **Conhecido ou desconhecido** | Conhecido | O agente conhece as regras: o que cada fonte fornece e quanto custa. Isso está declarado nas constantes. |
 <!--
 Perguntas que guiam o preenchimento:
   - Qual fatia do problema é um espaço de estados? (Nem toda fatia é — e
