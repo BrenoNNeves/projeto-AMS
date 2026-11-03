@@ -44,8 +44,8 @@ FONTES_PEQUENAS: tuple[Fonte, ...] = (
     Fonte("atendimento humano do RH", 15.0, ("saldo de dias do funcionário","regra de venda do acordo coletivo","janela mínima exigida pela política","aprovações pendentes do gestor")),
 )
 
-# A pergunta maior: "o pedido do cliente pode ser faturado hoje?" — oito
-# fatos, e nenhuma fonte cobre tudo sozinha.
+# A pergunta maior: "o pedido do cliente pode ser faturado hoje?" — quatorze
+# fatos, distribuídos entre fontes operacionais, fiscais e comerciais.
 FATOS_MAIORES: frozenset[str] = frozenset({
     "saldo de crédito do cliente",
     "status do cadastro fiscal",
@@ -55,6 +55,12 @@ FATOS_MAIORES: frozenset[str] = frozenset({
     "limite de faturamento sem aprovação",
     "pedidos em aberto do cliente",
     "regra de desconto do canal",
+    "bloqueio financeiro do cliente",
+    "condição de pagamento negociada",
+    "classificação fiscal do produto",
+    "endereço de entrega confirmado",
+    "restrição de venda para a região",
+    "notas fiscais pendentes de emissão",
 })
 FONTES_MAIORES: tuple[Fonte, ...] = (
     Fonte("ERP — ficha do cliente", 0.8, ("saldo de crédito do cliente",  "pedidos em aberto do cliente")),
@@ -73,7 +79,13 @@ FONTES_MAIORES: tuple[Fonte, ...] = (
                                                 "prazo de entrega da transportadora",
                                                 "limite de faturamento sem aprovação",
                                                 "pedidos em aberto do cliente",
-                                                "regra de desconto do canal")),
+                                                "regra de desconto do canal",
+                                                "bloqueio financeiro do cliente",
+                                                "condição de pagamento negociada",
+                                                "classificação fiscal do produto",
+                                                "endereço de entrega confirmado",
+                                                "restrição de venda para a região",
+                                                "notas fiscais pendentes de emissão")),
     Fonte("dashboards de operação", 3.0, ("estoque disponível do item",
                                         "pedidos em aberto do cliente")),
     Fonte("robô de email do comercial", 9.0, ("limite de faturamento sem aprovação",
@@ -82,6 +94,13 @@ FONTES_MAIORES: tuple[Fonte, ...] = (
                                         "preço vigente da tabela")),
     Fonte("consulta do jurídico", 14.0, ("status do cadastro fiscal",
                                         "limite de faturamento sem aprovação")),
+    Fonte("portal financeiro do cliente", 1.6, ("bloqueio financeiro do cliente",
+                                                "notas fiscais pendentes de emissão")),
+    Fonte("contratos comerciais", 2.2, ("condição de pagamento negociada",
+                                    "regra de desconto do canal")),
+    Fonte("cadastro fiscal de produtos", 1.8, ("classificação fiscal do produto",)),
+    Fonte("cadastro de entregas", 1.4, ("endereço de entrega confirmado",
+                                    "restrição de venda para a região")),
 )
 
 

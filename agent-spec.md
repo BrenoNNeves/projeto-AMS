@@ -21,31 +21,13 @@ para qualquer empresa é uma linha genérica — o exemplo do seu segmento
 
 ## 1. PEAS
 
--->
-**Quando se preenche:** no Laboratório 01, hoje. Refinado na Atividade Orientada.
-
-**Performance:**
-
-O desempenho vai partir do pincipio se o agente esta classificando corretamente as ordens de serviço, tendo a formula a porcentagem de acertos, meta de aceito é de 95% hoje (70%)
-Fórmula:
-
-Taxa de acerto = (Número de ordens com todas as decisões corretas / Total de ordens avaliadas) × 100
-
-
-**Environment:**
-
-sensores de temperatura, rotação, torque e desgaste de ferramenta, tecnico responsavel
-
-**Actuators:**
-
-Classificar o risco como medio/baixo/alto indicar quais normas regulamentadas são aplicadas e se é necessario realizar um bloqueio. Além disso, devera apresentar uma justificativa clara para suas recomendações, permitindo que o tecnico entenda os fatores considerados na análise. Os resultados serão organizados em um objeto estruturado chamado AvaliacaoRisco, facilitando a validação e o uso das informações por outros componentes do sistema.
-
-**Sensors:**
-
-O agente utilizará as leituras de temperatura, rotação, torque e desgaste de ferramenta, além dos dados disponíveis sobre a máquina e seu histórico de falhas. Na etapa inicial do projeto, essas informações serão obtidas principalmente do dataset público AI4I 2020 Predictive Maintenance Dataset.
-
-Também serão utilizadas as descrições textuais das ordens de serviço, que ajudam a compreender qual intervenção será realizada e quais condições precisam ser consideradas.
-
+| Elemento | Descrição |
+|---|---|
+| **Quando se preenche** | O PEAS será elaborado no Laboratório 01 e poderá ser refinado posteriormente durante a Atividade Orientada. |
+| **Performance (Desempenho)** | O desempenho do agente será medido pela sua capacidade de classificar corretamente as ordens de serviço. A meta inicial é alcançar uma taxa de acerto de 70%, com objetivo de evolução para 95%. A avaliação considera se todas as decisões tomadas para cada ordem estão corretas. **Fórmula:** Taxa de acerto = (Número de ordens com todas as decisões corretas / Total de ordens avaliadas) × 100. |
+| **Environment (Ambiente)** | O ambiente envolve as máquinas industriais, os sensores responsáveis por coletar dados de temperatura, rotação, torque e desgaste de ferramentas, além dos técnicos responsáveis pelas intervenções de manutenção. |
+| **Actuators (Atuadores)** | O agente deverá classificar o nível de risco da intervenção como baixo, médio ou alto, identificar as normas regulamentadoras aplicáveis e indicar se é necessário realizar o bloqueio da máquina (LOTO). Também deverá apresentar uma justificativa clara para cada recomendação, permitindo que o técnico compreenda os fatores considerados na análise. Os resultados serão organizados em um objeto estruturado chamado `AvaliacaoRisco`, facilitando sua validação e utilização por outros componentes do sistema. |
+| **Sensors (Sensores)** | O agente utilizará leituras de temperatura, rotação, torque e desgaste de ferramentas, além de informações sobre a máquina e seu histórico de falhas. Na etapa inicial do projeto, esses dados serão obtidos principalmente do dataset público AI4I 2020 Predictive Maintenance Dataset. Também serão consideradas as descrições textuais das ordens de serviço, que ajudam a identificar qual intervenção será realizada e quais condições precisam ser avaliadas. |
 ---
 
 ## 2. O ambiente em sete dimensões
@@ -174,23 +156,20 @@ Perguntas que guiam o preenchimento:
 
 ---
 
-## 6. Catálogo de ações
+### 6. Catálogo de ações
 
-<!--
-Perguntas que guiam o preenchimento:
-  - Para cada ação: nome, entrada, saída, é reversível?, qual o risco se
-    errar? As quatro colunas são obrigatórias — "baixo" não é descrição de
-    risco.
-  - Ações de leitura E de escrita: as que alteram o mundo são as que exigem
-    cuidado, e são justamente as que mais ficam de fora.
-  - Este catálogo é, literalmente, a lista de ferramentas que você vai
-    implementar em D10.
--->
-**Quando se preenche:** na Atividade Orientada — o pacote `D2-07` traz o
-modelo da tabela e dois exemplos preenchidos.
+| Ação | Entrada | Saída | É reversível? | Risco se algo der errado |
+|---|---|---|---|---|
+| **Ler a ordem de serviço** | Número da ordem (`id_ordem`). | Identificação da máquina (UDI), descrição do serviço e data da solicitação. | Sim. Apenas consulta informações, sem alterar os dados. | Uma descrição incompleta ou pouco clara pode esconder riscos importantes. Por exemplo, um serviço no ventilador de um forro metálico pode envolver trabalho em altura (NR-35), mas essa necessidade pode passar despercebida. |
+| **Consultar sensores e histórico de falhas da máquina** | Identificação da máquina (UDI). | Dados de temperatura, RPM, torque, desgaste de ferramentas e histórico recente de falhas. | Sim. Apenas consulta informações. | Consultar dados de outra máquina ou informações desatualizadas pode levar a uma avaliação incorreta. Além disso, no dataset AI4I, o campo de falha representa o que aconteceu naquele registro, e não uma previsão de falha futura. |
+| **Consultar as normas de segurança (NR-10, NR-12 e NR-35)** | Tipo de intervenção e palavras-chave relacionadas ao serviço. | Trechos relevantes das normas, acompanhados de suas respectivas fontes. | Sim. Apenas consulta informações. | Utilizar trechos de normas desatualizadas ou que não se aplicam à atividade pode gerar recomendações incorretas e comprometer a segurança da intervenção. |
+| **Avaliar a ordem de serviço (riscos, normas e LOTO)** | Leituras dos sensores, histórico de falhas, descrição do serviço e trechos das normas. | Objeto `AvaliacaoRisco`, contendo nível de risco, normas aplicáveis, necessidade de LOTO e justificativa da avaliação. | Sim. Apenas realiza cálculos e análises, sem executar ações externas. | Subestimar um risco pode fazer com que uma máquina prestes a apresentar uma falha seja tratada como se estivesse em condições normais. Por outro lado, superestimar os riscos pode gerar paradas desnecessárias e excesso de alertas, fazendo com que avisos importantes percam a atenção dos técnicos. |
+| **Comunicar a avaliação ao técnico** | Objeto `AvaliacaoRisco` e um resumo da justificativa. | Recomendação de segurança enviada ao técnico responsável. | Parcialmente. A mensagem pode ser corrigida, mas o técnico pode já ter iniciado alguma ação com base na orientação recebida. | Uma orientação incorreta, como informar que o LOTO não é necessário quando deveria ser aplicado, pode levar o técnico a trabalhar com uma máquina energizada ou com partes móveis sem o devido bloqueio, aumentando o risco de acidentes graves. |
+| **Encaminhar o caso ao supervisor de segurança** | Ordem de serviço, resultado da avaliação e motivo da necessidade de revisão, como risco elevado ou dúvida na interpretação de uma norma. | Caso encaminhado para análise e aprovação do supervisor. | Sim. O supervisor pode revisar a avaliação e devolver o caso para ajustes. | Encaminhar todos os casos para revisão pode sobrecarregar o supervisor e fazer com que alertas importantes sejam ignorados. Por outro lado, deixar de encaminhar situações realmente duvidosas pode permitir que uma intervenção insegura prossiga sem a devida análise. |
+| **Registrar a avaliação para auditoria** | Objeto `AvaliacaoRisco`, dados utilizados na análise e horário do registro. | Registro permanente da avaliação, permitindo consultar o histórico e acompanhar possíveis correções. | Parcialmente. O registro original não pode ser apagado, mas é possível adicionar uma retificação. | Uma justificativa incorreta pode permanecer no histórico e comprometer futuras auditorias (D12). Também é importante evitar o armazenamento desnecessário de dados pessoais dos técnicos, respeitando os princípios da LGPD. |
+| **Autorizar o início da intervenção** | Ordem de serviço avaliada, confirmação do bloqueio LOTO pelo técnico e aprovação do supervisor. | Autorização para iniciar a atividade no fluxo de manutenção. | Não. Depois que a intervenção começa, não é possível simplesmente desfazer seus efeitos. | É uma ação de alto risco, pois autorizar o início do serviço sem confirmar o bloqueio efetivo da máquina pode provocar uma partida inesperada e causar acidentes graves. A decisão final e a execução da intervenção devem permanecer sob responsabilidade humana. |
 
-[tabela: nome · entrada · saída · é reversível? · risco se
-errar — ações de leitura e de escrita]
+*Comentario que importa:* A maioria das ações vão ser realizadas pelo agente, porém a decisão final da manutenção devera ser feita com o tecnico responsavel
 
 ---
 
