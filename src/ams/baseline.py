@@ -1,99 +1,37 @@
-#C:\Users\brenoPC\Desktop\CEDAG\projeto-AMS\data\raw\ai4i2020.csv
-
-"""Laboratório 06 — o agente de linha de base do seu domínio.
-
-O agente mais simples que resolve uma fatia do problema, SEM modelo de
-linguagem: percepção (o registro), decisão (regras explícitas), ação (a
-recomendação) e medida (a métrica primária do `agent-spec.md`, sobre 30
-casos). O número que sai daqui é a linha de base contra a qual o agente de
-D10 vai ser comparado — sem ela, "melhorou" é opinião.
-
-Estrutura do slide 22 do D2-E4: uma função `decidir(registro, estado)` com
-duas condições — a primeira REATIVA (só a percepção do instante) e a
-segunda consultando ESTADO INTERNO (o que o agente já observou do mundo).
-Quem caracterizou o ambiente como totalmente observável pode APAGAR a
-segunda condição e ficar com um reativo simples — e registra a escolha na
-análise, porque o tipo de agente é parte do que a rubrica avalia.
-
-Como usar:
-    1. adapte as regras (os TODOs) e os limiares ao SEU domínio;
-    2. aponte CAMINHO_DOS_CASOS para o seu conjunto de 30 casos rotulados
-       (ou deixe no conjunto de reserva — ver COMO-USAR-A-RESERVA.pdf);
-    3. rode:  python medir.py
-    4. quando o baseline estiver pronto, copie as funções para
-       `src/<projeto>/baseline.py` — é o caminho que a entrega final cobra.
-
-Este módulo roda de fábrica sobre o conjunto de reserva que viaja no
-pacote: medida funcionando antes da primeira adaptação.
-"""
-
 from __future__ import annotations
 
 import csv
-from datetime import date as _date
+import math
 from pathlib import Path
 
+CAMINHO_DOS_CASOS = r"C:\Users\brenoPC\Desktop\CEDAG\projeto-AMS\data\dados\30_novos_casos_ams.csv"
 # --------------------------------------------------------------------------
-# Configuração — a troca do dataset é UMA LINHA aqui (slide 29).
+# Os limiares — um por modo de falha do dataset (TWF, HDF, PWF, OSF)
 # --------------------------------------------------------------------------
-CAMINHO_DOS_CASOS = "C:\\Users\\brenoPC\\Desktop\\CEDAG\\projeto-AMS\\data\\raw\\ai4i2020.csv"
-# Troque pelo SEU conjunto quando estiver pronto:
-# CAMINHO_DOS_CASOS = "dados/meus_casos.csv"
+LIMITE_DESGASTE = 200            # min — TWF ocorre na faixa de 200 a 240 min
+LIMITE_DELTA_T = 8.6             # K — HDF: processo menos o ar abaixo disso...
+LIMITE_ROTACAO_HDF = 1380        # rpm — ...e rotação abaixo disso
+POTENCIA_MINIMA = 3500.0         # W — PWF: potência fora da faixa [3500, 9000]
+POTENCIA_MAXIMA = 9000.0         # W
+LIMITE_SOBRECARGA = {"L": 11000, "M": 12000, "H": 13000}  # min·Nm — OSF
 
-# --------------------------------------------------------------------------
-# Os limiares das regras — TODO: troque pelos do SEU domínio.
-# (Os valores abaixo são os do domínio de exemplo: máquinas industriais.)
-# --------------------------------------------------------------------------
-LIMITE_POTENCIA_MIN = 3500.0       # W   — PWF
-LIMITE_POTENCIA_MAX = 9000.0       # W   — PWF
-LIMITE_DELTA_T = 8.6               # K   — HDF (com rpm baixo)
-LIMITE_RPM_HDF = 1380              # rpm — HDF
-LIMITE_OSF = {"L": 11000.0, "M": 12000.0, "H": 13000.0}   # desgaste*torque — OSF
-DESGASTE_ATENCAO = 200             # min — TWF (troca/falha entre 200 e 240)
 RISCO_ALTO = "alto"
 RISCO_BAIXO = "baixo"
-# --------------------------------------------------------------------------
-# Estado interno — a memória do que o agente JÁ OBSERVOU do ambiente.
-# O agente não sabe o futuro: ele acumula os desfechos que o ambiente
-# revelou até agora. E "até agora" tem política de esquecimento — decidir
-# por quanto tempo guardar é parte da decisão de estado interno (slide 24
-# do E2). Sem a janela, duas falhas antigas deixariam a família inteira em
-# inspeção para sempre. Quem apagar a segunda condição de decidir() pode
-# apagar esta classe junto.
-# --------------------------------------------------------------------------
+
+# Colunas do CSV (as originais do AI4I 2020) -> chaves usadas pelas regras
+COLUNAS = {
+    "UDI": "udi",
+    "Type": "tipo",
+    "Air temperature [K]": "temperatura_ar",
+    "Process temperature [K]": "temperatura_processo",
+    "Rotational speed [rpm]": "rotacao",
+    "Torque [Nm]": "torque",
+    "Tool wear [min]": "desgaste",
+    "Machine failure": "falha",
+}
 
 
-class EstadoDaFrota:
-    """O que o agente já observou: falhas por família, dentro da janela."""
-
-    def __init__(self, janela_dias: int = JANELA_DIAS) -> None:
-        self._janela = janela_dias
-        self._falhas: list[tuple[str, _date]] = []
-        self._ultima_data: _date | None = None
-
-    def falhas_recentes(self, familia: str) -> int:
-        """Quantas falhas desta família o agente viu, dentro da janela."""
-        if self._ultima_data is None:
-            return 0
-        limite = self._ultima_data.toordinal() - self._janela
-        return sum(
-            1 for familia_vista, dia in self._falhas
-            if familia_vista == familia and dia.toordinal() >= limite)
-
-    def registrar_desfecho(self, registro: dict) -> None:
-        """O ambiente revela o desfecho do caso — a percepção do próximo
-        ciclo é maior do que a do anterior (parcialmente observável). Sem
-        desfecho observado, não há o que registrar."""
-        self._ultima_data = _date.fromisoformat(registro["data"])
-        if int(registro.get("falhou_depois", 0)) == 1:
-            self._falhas.append(
-                (registro["tipo_maquina"], self._ultima_data))
-
-
-# --------------------------------------------------------------------------
-# A decisão — o coração do agente, em oito linhas (slide 22)
-# --------------------------------------------------------------------------
-def potencia(registro: dict) -> float:
+def potencia_w(registro: dict) -> float:
     """Potência mecânica em watts: torque (Nm) x velocidade angular (rad/s)."""
     return registro["torque"] * registro["rotacao"] * 2 * math.pi / 60
 
@@ -105,38 +43,110 @@ def decidir(registro: dict) -> str:
     basta para risco alto. A ordem das regras não muda o resultado, só
     qual delas é citada.
     """
-    if registro["desgaste"] >= LIMITE_DESGASTE:
-        return RISCO_ALTO
     delta_t = registro["temperatura_processo"] - registro["temperatura_ar"]
-    if delta_t < LIMITE_DELTA_T and registro["rotacao"] < LIMITE_ROTACAO_HDF:
-        return RISCO_ALTO
-    if not POTENCIA_MINIMA <= potencia(registro) <= POTENCIA_MAXIMA:
-        return RISCO_ALTO
-    if registro["desgaste"] * registro["torque"] > LIMITE_SOBRECARGA[registro["tipo"]]:
-        return RISCO_ALTO
-    return RISCO_BAIXO
+    
+    condicoes_risco = [
+        registro["desgaste"] >= LIMITE_DESGASTE,
+        delta_t < LIMITE_DELTA_T and registro["rotacao"] < LIMITE_ROTACAO_HDF,
+        not (POTENCIA_MINIMA <= potencia_w(registro) <= POTENCIA_MAXIMA),
+        registro["desgaste"] * registro["torque"] > LIMITE_SOBRECARGA[registro["tipo"]],
+    ]
+
+    return RISCO_ALTO if any(condicoes_risco) else RISCO_BAIXO
+
 
 def carregar_casos(caminho: str | Path = CAMINHO_DOS_CASOS) -> list[dict]:
     """Lê o CSV de casos rotulados (colunas originais do AI4I) e converte os campos."""
-    with Path(caminho).open(encoding="utf-8-sig", newline="") as arquivo:
-        linhas = list(csv.DictReader(arquivo))
-    casos = []
-    for linha in linhas:
-        caso = {chave: linha[coluna] for coluna, chave in COLUNAS.items()}
-        caso.update(id_caso=linha["id_caso"], risco_correto=linha["risco_correto"],
-                    categoria=linha["categoria"])
-        caso["udi"] = int(caso["udi"])
-        caso["temperatura_ar"] = float(caso["temperatura_ar"])
-        caso["temperatura_processo"] = float(caso["temperatura_processo"])
-        caso["rotacao"] = int(caso["rotacao"])
-        caso["torque"] = float(caso["torque"])
-        caso["desgaste"] = int(caso["desgaste"])
-        caso["falha"] = int(caso["falha"])
-        casos.append(caso)
-    return casos
+    path_obj = Path(caminho)
+    
+    with path_obj.open(encoding="utf-8-sig", newline="") as arquivo:
+        leitor = csv.DictReader(arquivo)
+        
+        casos = []
+        for linha in leitor:
+            caso = {chave: linha[coluna] for coluna, chave in COLUNAS.items()}
+            caso.update(
+                id_caso=linha["id_caso"],
+                risco_correto=linha["risco_correto"],
+                categoria=linha["categoria"],
+            )
+            
+            # Conversão de tipos
+            caso["udi"] = int(caso["udi"])
+            caso["temperatura_ar"] = float(caso["temperatura_ar"])
+            caso["temperatura_processo"] = float(caso["temperatura_processo"])
+            caso["rotacao"] = int(caso["rotacao"])
+            caso["torque"] = float(caso["torque"])
+            caso["desgaste"] = int(caso["desgaste"])
+            caso["falha"] = int(caso["falha"])
+            
+            casos.append(caso)
+            
+        return casos
+
+
+def medir(caminho: str | Path = CAMINHO_DOS_CASOS, decisor=decidir) -> dict:
+    """Roda o agente sobre os casos e devolve a métrica primária e as secundárias.
+
+    Primária: falhas antecipadas — dos casos que falharam, a fração que o
+    agente classificou como risco alto. Secundária: alarmes falsos — dos
+    casos sem falha, a fração classificada como risco alto.
+    """
+    casos = carregar_casos(caminho)
+    
+    com_falha = [c for c in casos if c["falha"]]
+    sem_falha = [c for c in casos if not c["falha"]]
+    
+    antecipadas = sum(1 for c in com_falha if decisor(c) == RISCO_ALTO)
+    alarmes = [c for c in sem_falha if decisor(c) == RISCO_ALTO]
+    perdidas = [c for c in com_falha if decisor(c) != RISCO_ALTO]
+    acertos = sum(1 for c in casos if decisor(c) == c["risco_correto"])
+    
+    total_casos = len(casos)
+    total_com_falha = len(com_falha)
+    total_sem_falha = len(sem_falha)
+
+    return {
+        "caminho": str(caminho),
+        "total": total_casos,
+        "com_falha": total_com_falha,
+        "sem_falha": total_sem_falha,
+        "falhas_antecipadas": antecipadas,
+        "taxa_antecipadas": antecipadas / total_com_falha if total_com_falha else 0.0,
+        "alarmes_falsos": len(alarmes),
+        "taxa_alarmes_falsos": len(alarmes) / total_sem_falha if total_sem_falha else 0.0,
+        "acertos": acertos,
+        "falhas_perdidas": perdidas,
+        "alarmes": alarmes,
+    }
+
+
+def imprimir(resultado: dict) -> None:
+    """A métrica, o valor e o conjunto — e onde o agente erra."""
+    r = resultado
+    print("Métrica primária: falhas antecipadas (falhas classificadas como risco alto "
+          "sobre o total de falhas)")
+    print(f"Valor: {r['falhas_antecipadas']}/{r['com_falha']} = "
+          f"{round(r['taxa_antecipadas'], 4)}")
+    print(f"Secundária — alarmes falsos: {r['alarmes_falsos']}/{r['sem_falha']} = "
+          f"{round(r['taxa_alarmes_falsos'], 4)}")
+    print(f"Acerto geral (apenas para referência): {r['acertos']}/{r['total']}")
+    print(f"Conjunto: {r['caminho']} — {r['total']} casos ({r['com_falha']} com falha, "
+          f"{r['sem_falha']} sem falha)")
+    
+    if r["falhas_perdidas"]:
+        print("Falhas que o agente não antecipou:")
+        for c in r["falhas_perdidas"]:
+            print(f"  {c['id_caso']} (UDI {c['udi']}, {c['categoria']})")
+    else:
+        print("Falhas que o agente não antecipou: nenhuma")
+        
+    if r["alarmes"]:
+        print("Alarmes falsos (risco alto sem falha):")
+        for c in r["alarmes"]:
+            print(f"  {c['id_caso']} (UDI {c['udi']}, {c['categoria']}, "
+                  f"desgaste {c['desgaste']} min)")
 
 
 if __name__ == "__main__":
-    from medir import medir_e_imprimir
-
-    medir_e_imprimir(CAMINHO_DOS_CASOS, decidir, EstadoDaFrota)
+    imprimir(medir())

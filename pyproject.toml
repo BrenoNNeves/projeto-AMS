@@ -1,3 +1,5 @@
+
+
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
@@ -32,4 +34,8 @@ select = ["E", "F", "W", "I", "UP", "B", "DTZ"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 addopts = "-q"
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient`:DeprecationWarning",
+]
